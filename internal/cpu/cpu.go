@@ -1,25 +1,76 @@
 package cpu
 
 import (
-  "bytes"
   "fmt"
   "log"
   "os"
 )
 
-var PC uint16 = 0
-var I uint16
-var DelayTimer uint8
-var SoundTimer uint8
+type instruction struct {
+  full uint16
+  a uint8
+  x uint8
+  y uint8
+  n uint8
+  nn uint8
+  nnn uint16
+}
 
-var Display = [32*64]uint8{}
-// TODO: implement a stack
-var Stack [16]uint16
-var VariableRegister [16]uint8
+type chip8 struct {
+  pc uint16
+  i uint16
+  delayTimer uint8
+  soundTimer uint8
+  display [32*64]uint8
+  // TODO: implement a stack
+  stack [16]uint16
+  variableRegister [16]uint8
+  memory [4096]byte
+  instructionMap map[uint8]func(*instruction)
+}
 
-var Memory = bytes.NewBuffer(make([]byte, 0, 4096))
+func (c8 *chip8) incrementPC() {
+  c8.pc += 2
+}
 
-var Font = []uint16{
+// TODO: split this up and add functionality
+//   1. load entire file into `memory` starting at address 0x200
+//   2. fetch and decode function that accesses that memory directly
+//   need to set starting bound on where to place in memory, abstract it away
+func (c8 *chip8) FetchAndDecode(file os.File) instruction {
+  twoBytes := make([]byte, 2)
+  offset, err := file.Seek(int64(c8.pc), 0)
+  if err != nil {
+    log.Fatal("problem seeking in file: %s", err)
+  }
+  _, err = file.Read(twoBytes)
+  if err != nil {
+    log.Fatal("problem reading instruction: %s", err)
+  }
+  coded_instruction := (uint16(twoBytes[0]) << 8) | uint16(twoBytes[1])
+  fmt.Printf("two bytes at %d: %x\n", offset, coded_instruction)
+  c8.incrementPC()
+  return instruction{
+    coded_instruction,
+    uint8((coded_instruction & 0xF000) >> 12),
+    uint8((coded_instruction & 0x0F00) >> 8),
+    uint8((coded_instruction & 0x00F0) >> 4),
+    uint8(coded_instruction & 0x000F),
+    uint8(coded_instruction & 0x00FF),
+    coded_instruction & 0x0FFF,
+  }
+}
+
+func (c8 *chip8) Execute(instruction *instruction) {
+  fmt.Printf("A, X, Y, N, NN, NNN: %x, %x, %x, %x, %x, %x\n", instruction.a, instruction.x, instruction.y, instruction.n, instruction.nn, instruction.nnn)
+  if instructionFunc, ok := c8.instructionMap[instruction.a]; ok {
+    instructionFunc(instruction)
+  } else {
+    log.Fatalf("no instruction for %x, first nibble %x", instruction.full, instruction.a)
+  }
+}
+
+var font = []uint8{
         0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
         0x20, 0x60, 0x20, 0x20, 0x70, // 1
         0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
@@ -38,59 +89,31 @@ var Font = []uint16{
         0xF0, 0x80, 0xF0, 0x80, 0x80,  // F
 }
 
-// i really want something that allows me to get:
-// - the first nibble
-// - the second nibble
-// - the third nibble
-// - the fourth nibble
-// - the second, third, fourth together
-// - the third, fourth together
-// that way i can get the first, route to a instruction function
-// via a hashmap based on the first nibble, pass the instruction uint16 (or custom type)
-// into the function, and allow the function to parse the other nibbles as needed.
+func NewChip8() *chip8 {
+  // load font into memory starting at 0x050
+  // TODO: abstract away this memory starting place
+  memory := [4096]byte{}
 
-// untested
-func getNibble(instruction uint16, i uint8) uint16 {
-  if i > 3 {
-    log.Fatal("Can't get %d nibble of instruction, it only has 0 - 3.", i)
+  for index, element := range font {
+    memory[0x050 + index] = element
   }
-  return instruction & (0x01 << (3-i))
-}
 
-func incrementPC() {
-  PC += 2
-}
+  instructionMap := map[uint8]func(*instruction){}
 
-func Fetch(file os.File) uint16 {
-  twoBytes := make([]byte, 2)
-  offset, err := file.Seek(int64(PC), 0)
-  if err != nil {
-    log.Fatal("problem seeking in file: %s", err)
-  }
-  _, err = file.Read(twoBytes)
-  if err != nil {
-    log.Fatal("problem reading instruction: %s", err)
-  }
-  instruction := (uint16(twoBytes[0]) << 8) | uint16(twoBytes[1])
-  fmt.Printf("two bytes at %d: %x\n", offset, instruction)
-  incrementPC()
-  return instruction
-}
+  c8 := chip8{0, 0, 0, 0, [32*64]uint8{}, [16]uint16{}, [16]uint8{}, memory, instructionMap}
 
-func Decode() {
-  fmt.Println("decode")
-}
+  // put instructions in a map
+  c8.instructionMap[0x0] = c8.I00E0
+  c8.instructionMap[0x1] = c8.I1NNN
+  c8.instructionMap[0x6] = c8.I6XNN
+  c8.instructionMap[0x7] = c8.I7XNN
+  c8.instructionMap[0xA] = c8.IANNN
 
-// maybe make hash map of instruction int --> instruction function implementation?
-// then Execute just passes 
-func Execute(instruction uint16) {
-  fmt.Println("execute")
-  I00E0()
+  return &c8
 }
 
 // debugging stuff
 
-func SetDisplay() {
-  Display[5] = 1
+func (c8 *chip8) SetDisplay() {
+  c8.display[5] = 1
 }
-

@@ -1,6 +1,6 @@
 #!/bin/bash
-if [ ! -f chip8 ]; then
-  rm chip8
+if [ ! -f app ]; then
+  rm app
 fi
 
-go build cmd/chip8/chip8.go
+go build cmd/app/app.go
