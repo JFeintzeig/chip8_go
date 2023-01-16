@@ -1,10 +1,18 @@
 package cpu
 
 import (
+  "bufio"
+  "errors"
   "fmt"
+  "io"
   "log"
   "os"
 )
+
+const PROGRAM_START uint16 = 0x200
+const MAX_PROGRAM_ADDRESS uint16 = 0xE8F
+const FONT_START uint16 = 0x050
+const CLOCK_SPEED uint16 = 2
 
 type instruction struct {
   full uint16
@@ -16,39 +24,55 @@ type instruction struct {
   nnn uint16
 }
 
-type chip8 struct {
+// TODO: i had to export Chip8 to use it in Display.go...another way?
+type Chip8 struct {
   pc uint16
   i uint16
   delayTimer uint8
   soundTimer uint8
-  display [32*64]uint8
+  Display [32*64]uint8
   // TODO: implement a stack
   stack [16]uint16
   variableRegister [16]uint8
   memory [4096]byte
   instructionMap map[uint8]func(*instruction)
+  ClockSpeed uint16
 }
 
-func (c8 *chip8) incrementPC() {
+func (c8 *Chip8) incrementPC() {
   c8.pc += 2
 }
 
-// TODO: split this up and add functionality
-//   1. load entire file into `memory` starting at address 0x200
-//   2. fetch and decode function that accesses that memory directly
-//   need to set starting bound on where to place in memory, abstract it away
-func (c8 *chip8) FetchAndDecode(file os.File) instruction {
-  twoBytes := make([]byte, 2)
-  offset, err := file.Seek(int64(c8.pc), 0)
+func (c8 *Chip8) LoadFile(filePath string) {
+  file, err := os.Open(filePath)
   if err != nil {
-    log.Fatal("problem seeking in file: %s", err)
+    log.Fatal("can't find file")
   }
-  _, err = file.Read(twoBytes)
-  if err != nil {
-    log.Fatal("problem reading instruction: %s", err)
+  br := bufio.NewReader(file)
+  i := uint16(0)
+  for {
+    b, err := br.ReadByte()
+    if err != nil && !errors.Is(err, io.EOF) {
+        fmt.Println(err)
+        break
+    }
+    c8.memory[PROGRAM_START + i] = b
+    if err != nil {
+        // end of file
+        break
+    }
+    if i > MAX_PROGRAM_ADDRESS {
+      log.Fatalf("Programs can only write between %x and %x in memory, loading this one overflowed",PROGRAM_START,MAX_PROGRAM_ADDRESS)
+    }
+    i++
   }
+}
+
+// TODO: error handling that we don't outstep memory
+func (c8 *Chip8) FetchAndDecode() instruction {
+  twoBytes := c8.memory[c8.pc:c8.pc+2]
   coded_instruction := (uint16(twoBytes[0]) << 8) | uint16(twoBytes[1])
-  fmt.Printf("two bytes at %d: %x\n", offset, coded_instruction)
+  fmt.Printf("two bytes at %d: %x\n", c8.pc, coded_instruction)
   c8.incrementPC()
   return instruction{
     coded_instruction,
@@ -61,7 +85,7 @@ func (c8 *chip8) FetchAndDecode(file os.File) instruction {
   }
 }
 
-func (c8 *chip8) Execute(instruction *instruction) {
+func (c8 *Chip8) Execute(instruction *instruction) {
   fmt.Printf("A, X, Y, N, NN, NNN: %x, %x, %x, %x, %x, %x\n", instruction.a, instruction.x, instruction.y, instruction.n, instruction.nn, instruction.nnn)
   if instructionFunc, ok := c8.instructionMap[instruction.a]; ok {
     instructionFunc(instruction)
@@ -89,18 +113,17 @@ var font = []uint8{
         0xF0, 0x80, 0xF0, 0x80, 0x80,  // F
 }
 
-func NewChip8() *chip8 {
-  // load font into memory starting at 0x050
-  // TODO: abstract away this memory starting place
+func NewChip8() *Chip8 {
+  // load font into memory starting at FONT_START
   memory := [4096]byte{}
 
   for index, element := range font {
-    memory[0x050 + index] = element
+    memory[FONT_START + uint16(index)] = element
   }
 
   instructionMap := map[uint8]func(*instruction){}
 
-  c8 := chip8{0, 0, 0, 0, [32*64]uint8{}, [16]uint16{}, [16]uint8{}, memory, instructionMap}
+  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, [16]uint16{}, [16]uint8{}, memory, instructionMap, CLOCK_SPEED}
 
   // put instructions in a map
   c8.instructionMap[0x0] = c8.I00E0
@@ -114,6 +137,6 @@ func NewChip8() *chip8 {
 
 // debugging stuff
 
-func (c8 *chip8) SetDisplay() {
-  c8.display[5] = 1
+func (c8 *Chip8) SetDisplay() {
+  c8.Display[5] = 1
 }
