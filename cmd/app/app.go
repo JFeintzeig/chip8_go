@@ -25,7 +25,7 @@ func main() {
   flag.Parse()
 
   fmt.Println("Starting up...")
-  chip8 := cpu.NewChip8()
+  chip8 := cpu.NewChip8(*debug)
   chip8.LoadFile(*file)
 
   // debug
@@ -37,6 +37,8 @@ func main() {
   ebiten.SetWindowSize(640, 320)
   ebiten.SetWindowTitle("Hello, World!")
   game, _ := display.NewGame(chip8, debug)
+  // do i want this? do i want to configure loop differently?
+  ebiten.SetTPS(500)
   // execution loop now runs in ebiten
   if err := ebiten.RunGame(game); err != nil {
     log.Fatal(err)
