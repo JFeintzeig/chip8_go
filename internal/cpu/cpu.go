@@ -41,6 +41,7 @@ type Chip8 struct {
   // could maybe have a debugger struct w/methods that interfaces with Chip8...if part
   // of package it can see private vars...?
   debug bool
+  modern bool
 }
 
 func (c8 *Chip8) incrementPC() {
@@ -117,7 +118,7 @@ var font = []uint8{
         0xF0, 0x80, 0xF0, 0x80, 0x80,  // F
 }
 
-func NewChip8(debug bool) *Chip8 {
+func NewChip8(debug bool, modern bool) *Chip8 {
   // load font into memory starting at FONT_START
   memory := [4096]byte{}
 
@@ -127,7 +128,7 @@ func NewChip8(debug bool) *Chip8 {
 
   instructionMap := map[uint8]func(*instruction){}
 
-  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, [16]uint16{}, [16]uint8{}, memory, instructionMap, CLOCK_SPEED, debug}
+  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, [16]uint16{}, [16]uint8{}, memory, instructionMap, CLOCK_SPEED, debug, modern}
 
   // put instructions in a map
   c8.instructionMap[0x0] = c8.I00E0

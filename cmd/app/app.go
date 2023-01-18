@@ -13,19 +13,21 @@ import (
 
 var (
   debug *bool
+  modern *bool
   file *string
 )
 
 func init() {
   file = flag.String("file","data/ibm_logo.ch8","path to file to load")
   debug = flag.Bool("debug",false,"set true to debug output")
+  modern = flag.Bool("modern",true,"set true to use modern interpretation of ambiguous instructions, default true")
 }
 
 func main() {
   flag.Parse()
 
   fmt.Println("Starting up...")
-  chip8 := cpu.NewChip8(*debug)
+  chip8 := cpu.NewChip8(*debug, *modern)
   chip8.LoadFile(*file)
 
   // debug
