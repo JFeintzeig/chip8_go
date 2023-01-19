@@ -30,18 +30,14 @@ func main() {
   chip8 := cpu.NewChip8(*debug, *modern)
   chip8.LoadFile(*file)
 
-  // debug
-  if *debug {
-    chip8.SetDisplay()
-    fmt.Println(chip8)
-  }
-
   ebiten.SetWindowSize(640, 320)
   ebiten.SetWindowTitle("Hello, World!")
-  game, _ := display.NewGame(chip8, debug)
-  // do i want this? do i want to configure loop differently?
-  ebiten.SetTPS(500)
-  // execution loop now runs in ebiten
+  game, _ := display.NewGame(chip8)
+
+  // infinite loop at chip8.clockSpeed
+  go chip8.Execute()
+
+  // display updates @ 60Hz via infinite loop in ebiten
   if err := ebiten.RunGame(game); err != nil {
     log.Fatal(err)
   }

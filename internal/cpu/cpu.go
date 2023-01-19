@@ -7,12 +7,13 @@ import (
   "io"
   "log"
   "os"
+  "time"
 )
 
 const PROGRAM_START uint16 = 0x200
 const MAX_PROGRAM_ADDRESS uint16 = 0xE8F
 const FONT_START uint16 = 0x050
-const CLOCK_SPEED uint16 = 2
+const CLOCK_SPEED uint16 = 500
 
 type instruction struct {
   full uint16
@@ -23,6 +24,13 @@ type instruction struct {
   nn uint8
   nnn uint16
 }
+
+type DebugState int
+
+const (
+  PAUSED DebugState = iota
+  RUNNING
+)
 
 // TODO: i had to export Chip8 to use it in Display.go...another way?
 type Chip8 struct {
@@ -36,12 +44,14 @@ type Chip8 struct {
   variableRegister [16]uint8
   memory [4096]byte
   instructionMap map[uint8]func(*instruction)
-  ClockSpeed uint16
+  clockSpeed uint16
   // TODO: think where debug should live / interact
   // could maybe have a debugger struct w/methods that interfaces with Chip8...if part
   // of package it can see private vars...?
-  debug bool
   modern bool
+  debug bool
+  debugState DebugState
+  debugBreakpoint uint16
 }
 
 func (c8 *Chip8) incrementPC() {
@@ -74,10 +84,9 @@ func (c8 *Chip8) LoadFile(filePath string) {
 }
 
 // TODO: error handling that we don't outstep memory
-func (c8 *Chip8) FetchAndDecode() instruction {
+func (c8 *Chip8) fetchAndDecode() instruction {
   twoBytes := c8.memory[c8.pc:c8.pc+2]
   coded_instruction := (uint16(twoBytes[0]) << 8) | uint16(twoBytes[1])
-  fmt.Printf("two bytes at %d: %x\n", c8.pc, coded_instruction)
   c8.incrementPC()
   return instruction{
     coded_instruction,
@@ -90,12 +99,76 @@ func (c8 *Chip8) FetchAndDecode() instruction {
   }
 }
 
-func (c8 *Chip8) Execute(instruction *instruction) {
-  fmt.Printf("A, X, Y, N, NN, NNN: %x, %x, %x, %x, %x, %x\n", instruction.a, instruction.x, instruction.y, instruction.n, instruction.nn, instruction.nnn)
+func (c8 *Chip8) executeInstruction(instruction *instruction) {
   if instructionFunc, ok := c8.instructionMap[instruction.a]; ok {
     instructionFunc(instruction)
   } else {
     log.Fatalf("no instruction for %x, first nibble %x", instruction.full, instruction.a)
+  }
+}
+
+func (c8 *Chip8) debugInstruction(instruction *instruction) {
+  c8.executeInstruction(instruction)
+  if c8.pc == c8.debugBreakpoint {
+    c8.debugState = PAUSED
+  }
+  DebugLoop:
+    for c8.debugState == PAUSED {
+      fmt.Printf("PC (incremented): %x; Instruction just executed: %x; A: %x; X: %x; Y: %x; N: %x; NN: %x; NNN: %x\n",
+          c8.pc, instruction.full, instruction.a, instruction.x, instruction.y, instruction.n, instruction.nn, instruction.nnn)
+      fmt.Printf("Debug: (s)tate, (c)ontinue, (n)ext, (q)uit, (b)reakpoint, $<variable>, (h)elp\n")
+      command, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+      switch string(command[0]) {
+      case "s":
+        // TODO
+        c8.prettyPrint()
+      case "c":
+        c8.debugState = RUNNING
+      case "n":
+        break DebugLoop
+      case "q":
+        os.Exit(0)
+      case "b":
+        // TODO: parsing doesn't work b/c i read a string i think...
+        c8.debugBreakpoint = uint16(command[0]) << 8 | uint16(command[1])
+        fmt.Printf("%x", c8.debugBreakpoint)
+        fmt.Printf("%s", command)
+        c8.debugState = RUNNING
+      case "$":
+        // TODO
+        c8.safeValuePrint()
+      case "h":
+        fmt.Println(
+          `Commands:
+           > s    Print entire Chip8 state to console
+           > c    Continue with execution without stopping
+           > n    Execute instruction then pause again
+           > q    Quit progrm
+           > b    Set a breakpoint as a uint16 memory address in hex
+           > $    View a Chip8 field, e.g. $variableRegister[2]
+           > h    Help, print this message
+          `)
+      default:
+        fmt.Printf("Sorry, %s is not a validcommand", command)
+      }
+    }
+}
+
+func (c8 *Chip8) prettyPrint() {
+}
+
+func (c8 *Chip8) safeValuePrint() {
+}
+
+func (c8 *Chip8) Execute() {
+  for {
+    instruction := c8.fetchAndDecode()
+    if c8.debug {
+      c8.debugInstruction(&instruction)
+    } else {
+      c8.executeInstruction(&instruction)
+    }
+    time.Sleep(time.Duration(1000/c8.clockSpeed) * time.Millisecond)
   }
 }
 
@@ -128,7 +201,16 @@ func NewChip8(debug bool, modern bool) *Chip8 {
 
   instructionMap := map[uint8]func(*instruction){}
 
-  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, [16]uint16{}, [16]uint8{}, memory, instructionMap, CLOCK_SPEED, debug, modern}
+  var debugState DebugState
+  if debug {
+    debugState = PAUSED
+  } else {
+    debugState = RUNNING
+  }
+
+  debugBreakpoint := uint16(0x0000)
+
+  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, [16]uint16{}, [16]uint8{}, memory, instructionMap, CLOCK_SPEED, modern, debug, debugState, debugBreakpoint}
 
   // put instructions in a map
   c8.instructionMap[0x0] = c8.I00E0
@@ -139,10 +221,4 @@ func NewChip8(debug bool, modern bool) *Chip8 {
   c8.instructionMap[0xD] = c8.IDXYN
 
   return &c8
-}
-
-// debugging stuff
-
-func (c8 *Chip8) SetDisplay() {
-  c8.Display[5] = 1
 }

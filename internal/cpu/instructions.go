@@ -1,7 +1,6 @@
 package cpu
 
 import (
-  "fmt"
   "log"
 )
 
@@ -161,13 +160,15 @@ func (c8 *Chip8) IDXYN(inst * instruction) {
         // we have a 1d array representing a 2d screen; each 64 values is a row.
         index := (y+i)*64 + (x+spriteBit)
         // change display by xor'ing pixel with corresponding bit in sprite
-        c8.Display[index] = c8.Display[index] ^ (sprite >> (7-spriteBit) & 0x01)
+        displayPixel := c8.Display[index]
+        spritePixel := (sprite >> (7-spriteBit) & 0x01)
+        if (displayPixel & spritePixel) == 1 {
+          c8.variableRegister[0xF] = 1
+        } else {
+          c8.variableRegister[0xF] = 0
+        }
+        c8.Display[index] = displayPixel ^ spritePixel
       }
-    }
-    // TODO: refactor this somewhere else
-    if c8.debug {
-      fmt.Printf(" x %d \n y %d \n display index %d \n sprite %x \n",x,y,(y+i)*64 + x,sprite)
-      fmt.Println(c8.Display)
     }
   }
 }
