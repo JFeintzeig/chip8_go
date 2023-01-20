@@ -16,8 +16,8 @@ func (c8 *Chip8) I0NNN(inst *instruction) {
   log.Fatal("I0NNN is not implemented")
 }
 
-// TODO: implement
 func (c8 *Chip8) I00EE(inst *instruction) {
+  c8.stack, c8.pc = c8.stack.Pop()
 }
 
 // jump
@@ -25,8 +25,9 @@ func (c8 *Chip8) I1NNN(inst *instruction) {
   c8.pc = inst.nnn
 }
 
-// TODO: implement
 func (c8 *Chip8) I2NNN(inst *instruction) {
+  c8.stack = c8.stack.Push(c8.pc)
+  c8.pc = inst.nnn
 }
 
 // skip instruction if VX == NN

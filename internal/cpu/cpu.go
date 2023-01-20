@@ -32,6 +32,22 @@ const (
   RUNNING
 )
 
+type stack []uint16
+
+func (s stack) Push(val uint16) stack {
+  if len(s) > 16 {
+    log.Fatal("stack overflow")
+  }
+  return append(s, val)
+}
+
+func (s stack) Pop() (stack, uint16) {
+  l := len(s)
+  last := s[l-1]
+  s = s[:l-1]
+  return s, last
+}
+
 // TODO: i had to export Chip8 to use it in Display.go...another way?
 type Chip8 struct {
   pc uint16
@@ -39,8 +55,7 @@ type Chip8 struct {
   delayTimer uint8
   soundTimer uint8
   Display [32*64]uint8
-  // TODO: implement a stack
-  stack [16]uint16
+  stack stack
   variableRegister [16]uint8
   memory [4096]byte
   instructionMap map[uint8]func(*instruction)
@@ -210,7 +225,7 @@ func NewChip8(debug bool, modern bool) *Chip8 {
 
   debugBreakpoint := uint16(0x0000)
 
-  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, [16]uint16{}, [16]uint8{}, memory, instructionMap, CLOCK_SPEED, modern, debug, debugState, debugBreakpoint}
+  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, stack{}, [16]uint8{}, memory, instructionMap, CLOCK_SPEED, modern, debug, debugState, debugBreakpoint}
 
   // put instructions in a map
   c8.instructionMap[0x0] = c8.I00E0
