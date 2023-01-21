@@ -2,6 +2,7 @@ package cpu
 
 import (
   "log"
+  "math/rand"
 )
 
 // clear screen
@@ -146,8 +147,13 @@ func (c8 *Chip8) IBNNN(inst *instruction) {
   }
 }
 
+// random number, and with NN, put at VX
+func (c8 *Chip8) ICXNN(inst *instruction) {
+  c8.variableRegister[inst.x] = uint8(rand.Intn(256)) & inst.nn
+}
+
 // draw Display
-func (c8 *Chip8) IDXYN(inst * instruction) {
+func (c8 *Chip8) IDXYN(inst *instruction) {
   // choosing x+y starting place wraps the screen
   x := int(c8.variableRegister[inst.x] % 64)
   y := int(c8.variableRegister[inst.y] % 32)
@@ -170,6 +176,62 @@ func (c8 *Chip8) IDXYN(inst * instruction) {
         }
         c8.Display[index] = displayPixel ^ spritePixel
       }
+    }
+  }
+}
+
+// EX9E: if key corresponding to VX is pressed, skip next instruction
+// EXA1: if key corresponding to VX is _not_pressed, skip next instruction
+func (c8 *Chip8) IE(inst *instruction) {
+  key := c8.variableRegister[inst.x]
+  if key > 0xF {
+    log.Fatalf("Unknown key %x", key)
+  }
+
+  switch inst.nn {
+  case 0x9E:
+    if c8.Keyboard[key] {
+      c8.pc += 2
+    }
+  case 0xA1:
+    if !c8.Keyboard[key] {
+      c8.pc += 2
+    }
+  }
+}
+
+func (c8 *Chip8) IF(inst *instruction) {
+  switch inst.nn {
+  // set VX to delay timer
+  case 0x07:
+    c8.variableRegister[inst.x] = c8.delayTimer
+  // set delay timer to VX
+  // TODO: deal with delay+sound timer functionality in main execution loop
+  case 0x15:
+    c8.delayTimer = c8.variableRegister[inst.x]
+  // set sound timer to VX
+  case 0x18:
+    c8.soundTimer = c8.variableRegister[inst.x]
+  // add VX to index register
+  case 0x1E:
+    if uint16(c8.i) + uint16(c8.variableRegister[inst.x]) > 4095 {
+      c8.variableRegister[0xF] = 1
+    }
+    c8.i += uint16(c8.variableRegister[inst.x])
+  // block until key press, then store key in VX
+  case 0x0A:
+    isKeyPressed := false
+    key := uint8(0)
+    for index, element := range c8.Keyboard {
+      if element {
+        isKeyPressed = true
+        key = uint8(index)
+      }
+    }
+    if isKeyPressed {
+      c8.variableRegister[inst.x] = key
+    } else {
+      c8.pc -= 2
     }
   }
 }

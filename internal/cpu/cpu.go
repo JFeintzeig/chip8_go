@@ -59,6 +59,7 @@ type Chip8 struct {
   variableRegister [16]uint8
   memory [4096]byte
   instructionMap map[uint8]func(*instruction)
+  Keyboard [16]bool
   clockSpeed uint16
   // TODO: think where debug should live / interact
   // could maybe have a debugger struct w/methods that interfaces with Chip8...if part
@@ -225,7 +226,7 @@ func NewChip8(debug bool, modern bool) *Chip8 {
 
   debugBreakpoint := uint16(0x0000)
 
-  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, stack{}, [16]uint8{}, memory, instructionMap, CLOCK_SPEED, modern, debug, debugState, debugBreakpoint}
+  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, stack{}, [16]uint8{}, memory, instructionMap, [16]bool{}, CLOCK_SPEED, modern, debug, debugState, debugBreakpoint}
 
   // put instructions in a map
   c8.instructionMap[0x0] = c8.I00E0
