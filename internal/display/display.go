@@ -8,8 +8,7 @@ import (
 )
 
 var (
-  // TODO: how do i want it to look? maybe change to 10, could add gridlines for debugging.
-  pixel = ebiten.NewImage(9,10)
+  pixel = ebiten.NewImage(10,10)
 )
 
 func init() {
@@ -48,6 +47,7 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeigh
 
 func NewGame(c8 *cpu.Chip8) (*Game, error) {
   keyboard := [16]ebiten.Key{
+    ebiten.KeyX,
     ebiten.KeyDigit1,
     ebiten.KeyDigit2,
     ebiten.KeyDigit3,
@@ -57,7 +57,6 @@ func NewGame(c8 *cpu.Chip8) (*Game, error) {
     ebiten.KeyA,
     ebiten.KeyS,
     ebiten.KeyD,
-    ebiten.KeyX,
     ebiten.KeyZ,
     ebiten.KeyC,
     ebiten.KeyDigit4,
