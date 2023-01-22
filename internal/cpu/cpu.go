@@ -64,10 +64,11 @@ type Chip8 struct {
   instructionMap map[uint8]func(*instruction)
   Keyboard [16]bool
   clockSpeed uint16
+  modern bool
   // TODO: refactor debugger into separate struct in same package
   // could maybe have a debugger struct w/methods that interfaces with Chip8...if part
   // of package it can see private vars...?
-  modern bool
+  // TODO: figure out how to get debugger to work when program requires key presses
   debug bool
   debugState DebugState
   debugBreakpoint uint16
@@ -195,6 +196,10 @@ func (c8 *Chip8) Execute() {
     } else {
       c8.executeInstruction(&instruction)
     }
+    // TODO: run some tests to make sure this works like its supposed to, not sure
+    // if the timing is right
+    // TODO: also think if i want to edit the timing of key presses and how that works
+    // maybe await key instruction i want on key press and release?
     if c8.delayTimer > 0 && loopCounter % int(c8.clockSpeed/DELAY_SOUND_TIMER_UPDATE) == 0 {
       c8.delayTimer -= 1
     }
