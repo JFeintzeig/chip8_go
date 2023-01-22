@@ -64,7 +64,7 @@ type Chip8 struct {
   instructionMap map[uint8]func(*instruction)
   Keyboard [16]bool
   clockSpeed uint16
-  // TODO: think where debug should live / interact
+  // TODO: refactor debugger into separate struct in same package
   // could maybe have a debugger struct w/methods that interfaces with Chip8...if part
   // of package it can see private vars...?
   modern bool
@@ -182,6 +182,10 @@ func (c8 *Chip8) prettyPrint() {
 func (c8 *Chip8) safeValuePrint() {
 }
 
+// TODO: run some more test games, especially
+// newer stuff from https://johnearnest.github.io/chip8Archive/?sort=platform
+// see if i can find other bugs in my code
+// write unit tests
 func (c8 *Chip8) Execute() {
   loopCounter := 0
   for {
@@ -194,6 +198,7 @@ func (c8 *Chip8) Execute() {
     if c8.delayTimer > 0 && loopCounter % int(c8.clockSpeed/DELAY_SOUND_TIMER_UPDATE) == 0 {
       c8.delayTimer -= 1
     }
+    // TODO: implement sound!
     if c8.soundTimer > 0 && loopCounter % int(c8.clockSpeed/DELAY_SOUND_TIMER_UPDATE) == 0 {
       c8.soundTimer -= 1
     }

@@ -209,7 +209,6 @@ func (c8 *Chip8) IF(inst *instruction) {
   case 0x07:
     c8.variableRegister[inst.x] = c8.delayTimer
   // FX15: set delay timer to VX
-  // TODO: deal with delay+sound timer functionality in main execution loop
   case 0x15:
     c8.delayTimer = c8.variableRegister[inst.x]
   // FX18: set sound timer to VX
