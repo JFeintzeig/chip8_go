@@ -2,6 +2,8 @@ package cpu
 
 import (
   "bufio"
+  "encoding/binary"
+  "encoding/hex"
   "errors"
   "fmt"
   "io"
@@ -14,6 +16,7 @@ const PROGRAM_START uint16 = 0x200
 const MAX_PROGRAM_ADDRESS uint16 = 0xE8F
 const FONT_START uint16 = 0x050
 const CLOCK_SPEED uint16 = 500
+const DELAY_SOUND_TIMER_UPDATE uint16 = 60
 
 type instruction struct {
   full uint16
@@ -145,10 +148,10 @@ func (c8 *Chip8) debugInstruction(instruction *instruction) {
       case "q":
         os.Exit(0)
       case "b":
-        // TODO: parsing doesn't work b/c i read a string i think...
-        c8.debugBreakpoint = uint16(command[0]) << 8 | uint16(command[1])
-        fmt.Printf("%x", c8.debugBreakpoint)
-        fmt.Printf("%s", command)
+        fmt.Printf("Enter memory address in hex (e.g. 0xXXXX): ")
+        memToBreak, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+        val, _ := hex.DecodeString(string(memToBreak[2:]))
+        c8.debugBreakpoint = binary.BigEndian.Uint16(val)
         c8.debugState = RUNNING
       case "$":
         // TODO
@@ -159,8 +162,8 @@ func (c8 *Chip8) debugInstruction(instruction *instruction) {
            > s    Print entire Chip8 state to console
            > c    Continue with execution without stopping
            > n    Execute instruction then pause again
-           > q    Quit progrm
-           > b    Set a breakpoint as a uint16 memory address in hex
+           > q    Quit program
+           > b <0xXXXX>   Set a breakpoint as a uint16 memory address in hex
            > $    View a Chip8 field, e.g. $variableRegister[2]
            > h    Help, print this message
           `)
@@ -171,12 +174,16 @@ func (c8 *Chip8) debugInstruction(instruction *instruction) {
 }
 
 func (c8 *Chip8) prettyPrint() {
+  fmt.Printf("%x\n",c8.pc)
+  fmt.Printf("%x\n",c8.i)
+  fmt.Printf("%x\n", c8.variableRegister)
 }
 
 func (c8 *Chip8) safeValuePrint() {
 }
 
 func (c8 *Chip8) Execute() {
+  loopCounter := 0
   for {
     instruction := c8.fetchAndDecode()
     if c8.debug {
@@ -184,7 +191,14 @@ func (c8 *Chip8) Execute() {
     } else {
       c8.executeInstruction(&instruction)
     }
+    if c8.delayTimer > 0 && loopCounter % int(c8.clockSpeed/DELAY_SOUND_TIMER_UPDATE) == 0 {
+      c8.delayTimer -= 1
+    }
+    if c8.soundTimer > 0 && loopCounter % int(c8.clockSpeed/DELAY_SOUND_TIMER_UPDATE) == 0 {
+      c8.soundTimer -= 1
+    }
     time.Sleep(time.Duration(1000/c8.clockSpeed) * time.Millisecond)
+    loopCounter += 1
   }
 }
 
@@ -229,12 +243,22 @@ func NewChip8(debug bool, modern bool) *Chip8 {
   c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, stack{}, [16]uint8{}, memory, instructionMap, [16]bool{}, CLOCK_SPEED, modern, debug, debugState, debugBreakpoint}
 
   // put instructions in a map
-  c8.instructionMap[0x0] = c8.I00E0
+  c8.instructionMap[0x0] = c8.I0
   c8.instructionMap[0x1] = c8.I1NNN
+  c8.instructionMap[0x2] = c8.I2NNN
+  c8.instructionMap[0x3] = c8.I3XNN
+  c8.instructionMap[0x4] = c8.I4XNN
+  c8.instructionMap[0x5] = c8.I5XY0
   c8.instructionMap[0x6] = c8.I6XNN
   c8.instructionMap[0x7] = c8.I7XNN
+  c8.instructionMap[0x8] = c8.I8XYN
+  c8.instructionMap[0x9] = c8.I9XY0
   c8.instructionMap[0xA] = c8.IANNN
+  c8.instructionMap[0xB] = c8.IBNNN
+  c8.instructionMap[0xC] = c8.ICXNN
   c8.instructionMap[0xD] = c8.IDXYN
+  c8.instructionMap[0xE] = c8.IE
+  c8.instructionMap[0xF] = c8.IF
 
   return &c8
 }
