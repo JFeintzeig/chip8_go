@@ -77,28 +77,37 @@ func (c8 *Chip8) I8XYN(inst *instruction) {
   // 8XY1: set VX to (VX | VY)
   case 1:
     c8.variableRegister[inst.x] |= c8.variableRegister[inst.y]
+    if !c8.modern {
+      c8.variableRegister[0xF] = 0
+    }
   // 8XY2: set VX to (VX & VY)
   case 2:
     c8.variableRegister[inst.x] &= c8.variableRegister[inst.y]
+    if !c8.modern {
+      c8.variableRegister[0xF] = 0
+    }
   // 8XY3: set VX to (VX XOR VY)
   case 3:
     c8.variableRegister[inst.x] ^= c8.variableRegister[inst.y]
+    if !c8.modern {
+      c8.variableRegister[0xF] = 0
+    }
   // 8XY4: set VX to (VX + VY)
   case 4:
+    carry := uint8(0)
     if uint16(c8.variableRegister[inst.x]) + uint16(c8.variableRegister[inst.y]) > 255 {
-      c8.variableRegister[0xF] = 1
-    } else {
-      c8.variableRegister[0xF] = 0
+      carry = 1
     }
     c8.variableRegister[inst.x] += c8.variableRegister[inst.y]
+    c8.variableRegister[0xF] = carry
   // 8XY5: set VX to (VX - VY)
   case 5:
+    carry := uint8(0)
     if c8.variableRegister[inst.x] > c8.variableRegister[inst.y] {
-      c8.variableRegister[0xF] = 1
-    } else {
-      c8.variableRegister[0xF] = 0
+      carry = 1
     }
     c8.variableRegister[inst.x] -= c8.variableRegister[inst.y]
+    c8.variableRegister[0xF] = carry
   // 8XY6: shift VX one bit right
   case 6:
     if !c8.modern {
@@ -110,12 +119,12 @@ func (c8 *Chip8) I8XYN(inst *instruction) {
     c8.variableRegister[0xF] = rightMostBit
   // 8XY7: set VX to (VY - VX)
   case 7:
+    carry := uint8(0)
     if c8.variableRegister[inst.y] > c8.variableRegister[inst.x] {
-      c8.variableRegister[0xF] = 1
-    } else {
-      c8.variableRegister[0xF] = 0
+      carry = 1
     }
     c8.variableRegister[inst.x] = c8.variableRegister[inst.y] - c8.variableRegister[inst.x]
+    c8.variableRegister[0xF] = carry
   // 8XYE: shift VX one bit left
   case 0xE:
     if !c8.modern {
@@ -156,7 +165,7 @@ func (c8 *Chip8) IDXYN(inst *instruction) {
   // choosing x+y starting place wraps the screen
   x := int(c8.variableRegister[inst.x] % 64)
   y := int(c8.variableRegister[inst.y] % 32)
-  // do we draw down or up?
+  c8.variableRegister[0xF] = 0
   for i := 0; i < int(inst.n); i++ {
     sprite := c8.memory[c8.i + uint16(i)]
     // for bit in sprite, loop over display and xor sprite bit and memory bit
@@ -167,11 +176,9 @@ func (c8 *Chip8) IDXYN(inst *instruction) {
         index := (y+i)*64 + (x+spriteBit)
         // change display by xor'ing pixel with corresponding bit in sprite
         displayPixel := c8.Display[index]
-        spritePixel := (sprite >> (7-spriteBit) & 0x01)
+        spritePixel := ((sprite >> (7-spriteBit)) & 0x01)
         if (displayPixel & spritePixel) == 1 {
           c8.variableRegister[0xF] = 1
-        } else {
-          c8.variableRegister[0xF] = 0
         }
         c8.Display[index] = displayPixel ^ spritePixel
       }
@@ -189,12 +196,12 @@ func (c8 *Chip8) IE(inst *instruction) {
   switch inst.nn {
   // EX9E: if key corresponding to VX is pressed, skip next instruction
   case 0x9E:
-    if c8.Keyboard[key] {
+    if c8.Keyboard[key].Pressed {
       c8.pc += 2
     }
   // EXA1: if key corresponding to VX is _not_pressed, skip next instruction
   case 0xA1:
-    if !c8.Keyboard[key] {
+    if !c8.Keyboard[key].Pressed {
       c8.pc += 2
     }
   default:
@@ -225,13 +232,24 @@ func (c8 *Chip8) IF(inst *instruction) {
     isKeyPressed := false
     key := uint8(0)
     for index, element := range c8.Keyboard {
-      if element {
+      if element.Pressed {
         isKeyPressed = true
         key = uint8(index)
       }
     }
     if isKeyPressed {
-      c8.variableRegister[inst.x] = key
+    // Note: this blocks any cycles while it waits for key release
+    // vs. the "wait for keypress" functionality of this function
+    // actually returns so cycles run. The result is that timers
+    // will continue decrementing until key press, then they will
+    // pause until key release.
+    OuterLoop:
+      for true {
+        if c8.Keyboard[key].JustReleased {
+          break OuterLoop
+        }
+      }
+    c8.variableRegister[inst.x] = key
     } else {
       c8.pc -= 2
     }

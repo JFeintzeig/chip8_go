@@ -3,7 +3,7 @@ package display
 import (
   "image/color"
   "github.com/hajimehoshi/ebiten/v2"
-  //"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+  "github.com/hajimehoshi/ebiten/v2/inpututil"
   "jfeintzeig/chip8/internal/cpu"
 )
 
@@ -22,7 +22,8 @@ type Game struct {
 
 func (g *Game) Update() error {
   for index, key := range g.keyboard {
-    g.c8.Keyboard[index] = ebiten.IsKeyPressed(key)
+    g.c8.Keyboard[index].Pressed = ebiten.IsKeyPressed(key)
+    g.c8.Keyboard[index].JustReleased = inpututil.IsKeyJustReleased(key)
   }
   return nil
 }

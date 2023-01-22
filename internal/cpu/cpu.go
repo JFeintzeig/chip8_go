@@ -51,6 +51,15 @@ func (s stack) Pop() (stack, uint16) {
   return s, last
 }
 
+type keypress struct {
+  Pressed bool
+  JustReleased bool
+}
+
+func NewKeypress() keypress {
+  return keypress{false,false}
+}
+
 // TODO: i had to export Chip8 to use it in Display.go...another way?
 type Chip8 struct {
   pc uint16
@@ -62,7 +71,7 @@ type Chip8 struct {
   variableRegister [16]uint8
   memory [4096]byte
   instructionMap map[uint8]func(*instruction)
-  Keyboard [16]bool
+  Keyboard *[16]keypress
   clockSpeed uint16
   modern bool
   // TODO: refactor debugger into separate struct in same package
@@ -250,7 +259,9 @@ func NewChip8(debug bool, modern bool) *Chip8 {
 
   debugBreakpoint := uint16(0x0000)
 
-  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, stack{}, [16]uint8{}, memory, instructionMap, [16]bool{}, CLOCK_SPEED, modern, debug, debugState, debugBreakpoint}
+  keyboard := new([16]keypress)
+
+  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, stack{}, [16]uint8{}, memory, instructionMap, keyboard, CLOCK_SPEED, modern, debug, debugState, debugBreakpoint}
 
   // put instructions in a map
   c8.instructionMap[0x0] = c8.I0
