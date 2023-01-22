@@ -2,7 +2,10 @@ package display
 
 import (
   "image/color"
+  "github.com/hajimehoshi/ebiten/v2/audio"
+  "github.com/hajimehoshi/ebiten/v2/audio/mp3"
   "github.com/hajimehoshi/ebiten/v2"
+  "github.com/hajimehoshi/ebiten/v2/ebitenutil"
   "github.com/hajimehoshi/ebiten/v2/inpututil"
   "jfeintzeig/chip8/internal/cpu"
 )
@@ -18,12 +21,17 @@ func init() {
 type Game struct {
   c8 *cpu.Chip8
   keyboard [16]ebiten.Key
+  audioPlayer *audio.Player
 }
 
 func (g *Game) Update() error {
   for index, key := range g.keyboard {
     g.c8.Keyboard[index].Pressed = ebiten.IsKeyPressed(key)
     g.c8.Keyboard[index].JustReleased = inpututil.IsKeyJustReleased(key)
+  }
+  if g.c8.GetSoundTimer() > 0 {
+    g.audioPlayer.Play()
+    g.audioPlayer.Rewind()
   }
   return nil
 }
@@ -65,9 +73,16 @@ func NewGame(c8 *cpu.Chip8) (*Game, error) {
     ebiten.KeyF,
     ebiten.KeyV,
   }
-	g := &Game{
+
+  audioContext := audio.NewContext(48000)
+  f, _ := ebitenutil.OpenFile("data/beep.mp3")
+  d, _ := mp3.Decode(audioContext, f)
+  audioPlayer, _ := audio.NewPlayer(audioContext, d)
+
+  g := &Game{
     c8,
     keyboard,
-	}
-	return g, nil
+    audioPlayer,
+  }
+  return g, nil
 }

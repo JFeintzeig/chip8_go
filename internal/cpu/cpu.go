@@ -83,6 +83,10 @@ type Chip8 struct {
   debugBreakpoint uint16
 }
 
+func (c8 *Chip8) GetSoundTimer() uint8 {
+  return c8.soundTimer
+}
+
 func (c8 *Chip8) incrementPC() {
   c8.pc += 2
 }
