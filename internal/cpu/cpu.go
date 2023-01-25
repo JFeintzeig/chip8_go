@@ -10,6 +10,8 @@ import (
   "log"
   "os"
   "time"
+
+  "jfeintzeig/chip8/internal/utils"
 )
 
 const PROGRAM_START uint16 = 0x200
@@ -18,38 +20,12 @@ const FONT_START uint16 = 0x050
 const CLOCK_SPEED uint16 = 500
 const DELAY_SOUND_TIMER_UPDATE uint16 = 60
 
-type instruction struct {
-  full uint16
-  a uint8
-  x uint8
-  y uint8
-  n uint8
-  nn uint8
-  nnn uint16
-}
-
 type DebugState int
 
 const (
   PAUSED DebugState = iota
   RUNNING
 )
-
-type stack []uint16
-
-func (s stack) Push(val uint16) stack {
-  if len(s) > 16 {
-    log.Fatal("stack overflow")
-  }
-  return append(s, val)
-}
-
-func (s stack) Pop() (stack, uint16) {
-  l := len(s)
-  last := s[l-1]
-  s = s[:l-1]
-  return s, last
-}
 
 type keypress struct {
   Pressed bool
@@ -67,10 +43,10 @@ type Chip8 struct {
   delayTimer uint8
   soundTimer uint8
   Display [32*64]uint8
-  stack stack
+  stack utils.Stack
   variableRegister [16]uint8
   memory [4096]byte
-  instructionMap map[uint8]func(*instruction)
+  instructionMap map[uint8]func(*utils.Instruction)
   Keyboard *[16]keypress
   clockSpeed uint16
   modern bool
@@ -117,30 +93,22 @@ func (c8 *Chip8) LoadFile(filePath string) {
 }
 
 // TODO: error handling that we don't outstep memory
-func (c8 *Chip8) fetchAndDecode() instruction {
+func (c8 *Chip8) fetchAndDecode() utils.Instruction {
   twoBytes := c8.memory[c8.pc:c8.pc+2]
-  coded_instruction := (uint16(twoBytes[0]) << 8) | uint16(twoBytes[1])
+  codedInstruction := (uint16(twoBytes[0]) << 8) | uint16(twoBytes[1])
   c8.incrementPC()
-  return instruction{
-    coded_instruction,
-    uint8((coded_instruction & 0xF000) >> 12),
-    uint8((coded_instruction & 0x0F00) >> 8),
-    uint8((coded_instruction & 0x00F0) >> 4),
-    uint8(coded_instruction & 0x000F),
-    uint8(coded_instruction & 0x00FF),
-    coded_instruction & 0x0FFF,
-  }
+  return utils.DecodeInstruction(codedInstruction)
 }
 
-func (c8 *Chip8) executeInstruction(instruction *instruction) {
-  if instructionFunc, ok := c8.instructionMap[instruction.a]; ok {
+func (c8 *Chip8) executeInstruction(instruction *utils.Instruction) {
+  if instructionFunc, ok := c8.instructionMap[instruction.A]; ok {
     instructionFunc(instruction)
   } else {
-    log.Fatalf("no instruction for %x, first nibble %x", instruction.full, instruction.a)
+    log.Fatalf("no instruction for %x, first nibble %x", instruction.Full, instruction.A)
   }
 }
 
-func (c8 *Chip8) debugInstruction(instruction *instruction) {
+func (c8 *Chip8) debugInstruction(instruction *utils.Instruction) {
   c8.executeInstruction(instruction)
   if c8.pc == c8.debugBreakpoint {
     c8.debugState = PAUSED
@@ -148,7 +116,7 @@ func (c8 *Chip8) debugInstruction(instruction *instruction) {
   DebugLoop:
     for c8.debugState == PAUSED {
       fmt.Printf("PC (incremented): %x; Instruction just executed: %x; A: %x; X: %x; Y: %x; N: %x; NN: %x; NNN: %x\n",
-          c8.pc, instruction.full, instruction.a, instruction.x, instruction.y, instruction.n, instruction.nn, instruction.nnn)
+          c8.pc, instruction.Full, instruction.A, instruction.X, instruction.Y, instruction.N, instruction.NN, instruction.NNN)
       fmt.Printf("Debug: (s)tate, (c)ontinue, (n)ext, (q)uit, (b)reakpoint, $<variable>, (h)elp\n")
       command, _ := bufio.NewReader(os.Stdin).ReadString('\n')
       switch string(command[0]) {
@@ -252,7 +220,7 @@ func NewChip8(debug bool, modern bool) *Chip8 {
     memory[FONT_START + uint16(index)] = element
   }
 
-  instructionMap := map[uint8]func(*instruction){}
+  instructionMap := map[uint8]func(*utils.Instruction){}
 
   var debugState DebugState
   if debug {
@@ -265,7 +233,7 @@ func NewChip8(debug bool, modern bool) *Chip8 {
 
   keyboard := new([16]keypress)
 
-  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, stack{}, [16]uint8{}, memory, instructionMap, keyboard, CLOCK_SPEED, modern, debug, debugState, debugBreakpoint}
+  c8 := Chip8{PROGRAM_START, 0, 0, 0, [32*64]uint8{}, utils.Stack{}, [16]uint8{}, memory, instructionMap, keyboard, CLOCK_SPEED, modern, debug, debugState, debugBreakpoint}
 
   // put instructions in a map
   c8.instructionMap[0x0] = c8.I0
