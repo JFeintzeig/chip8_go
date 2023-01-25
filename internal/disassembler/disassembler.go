@@ -43,8 +43,30 @@ func (dis *disassembler) Disassemble() {
   }
 }
 
+func (dis *disassembler) writeX(mnemonic string, inst *utils.Instruction) string {
+  return "bcd v" + string(inst.X)
+}
+
 func (dis *disassembler) I0(inst *utils.Instruction) string {
-  return "test"
+  switch inst.NN {
+  case 0x0E:
+    return "clear"
+  case 0xEE:
+    return "return"
+  default:
+    log.Fatal("unknown last nibble for I0 instruction.")
+    return ""
+  }
+}
+
+func (dis *disassembler) IF(inst *utils.Instruction) string {
+  switch inst.NN {
+  case 0x33:
+    return dis.writeX("bcd", inst)
+  default:
+    log.Fatal("unknown last nibble for IF instruction.")
+    return ""
+  }
 }
 
 func NewDisassembler(inputFile *string, outputFile *string) disassembler {
@@ -58,6 +80,7 @@ func NewDisassembler(inputFile *string, outputFile *string) disassembler {
   }
 
   dis.instructionStrings[0x0] = dis.I0
+  dis.instructionStrings[0xF] = dis.IF
 
   return dis
 }
