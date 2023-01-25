@@ -4,3 +4,4 @@ if [ ! -f app ]; then
 fi
 
 go build cmd/app/app.go
+go build cmd/disassemble/disassemble.go
