@@ -39,11 +39,9 @@ func (inst *Instruction) SetMnemonicTypeTemplate() {
     case 0x00E0:
       inst.Mnemonic = "clear"
       inst.Type = FULL
-      inst.Template, _ = template.New("00E0").Parse("clear")
     case 0x00EE:
       inst.Mnemonic = "return"
       inst.Type = FULL
-      inst.Template, _ = template.New("00EE").Parse("return")
     }
   case 0x1:
     inst.Mnemonic = "jump"
@@ -182,7 +180,7 @@ func (s Stack) Pop() (Stack, uint16) {
 // given bytecode, decode and parse instruction
 func InstructionFromBytecode(codedInstruction uint16) Instruction {
   // TODO: infer instruction type, mnemonic, template
-  return Instruction{
+  inst := Instruction{
     Full: codedInstruction,
     A: uint8((codedInstruction & 0xF000) >> 12),
     X: uint8((codedInstruction & 0x0F00) >> 8),
@@ -191,6 +189,24 @@ func InstructionFromBytecode(codedInstruction uint16) Instruction {
     NN: uint8(codedInstruction & 0x00FF),
     NNN: codedInstruction & 0x0FFF,
   }
+  inst.SetMnemonicTypeTemplate()
+
+  switch inst.Type {
+    case FULL:
+      inst.Template, _ = template.New("Full").Parse("{{.Mnemonic}} # {{printf \"%04X\" .Full}}")
+    case X:
+      inst.Template, _ = template.New("XY").Parse("{{.Mnemonic}} V{{printf \"%X\" .X}} # {{printf \"%04X\" .Full}}")
+    case XY:
+      inst.Template, _ = template.New("XY").Parse("{{.Mnemonic}} V{{printf \"%X\" .X}} V{{printf \"%X\" .Y}} # {{printf \"%04X\" .Full}}")
+    case XYN:
+      inst.Template, _ = template.New("XYN").Parse("{{.Mnemonic}} V{{printf \"%X\" .X}} V{{printf \"%X\" .Y}} {{printf \"%X\" .N}} # {{printf \"%04X\" .Full}}")
+    case XNN:
+      inst.Template, _ = template.New("XNN").Parse("{{.Mnemonic}} V{{printf \"%X\" .X}} {{printf \"%02X\" .NN}} # {{printf \"%04X\" .Full}}")
+    case NNN:
+      inst.Template, _ = template.New("NNN").Parse("{{.Mnemonic}} {{printf \"%04X\" .NNN}} # {{printf \"%04X\" .Full}}")
+  }
+
+  return inst
 }
 
 // another method for InstructionFromString?
