@@ -97,7 +97,7 @@ func (c8 *Chip8) fetchAndDecode() utils.Instruction {
   twoBytes := c8.memory[c8.pc:c8.pc+2]
   codedInstruction := (uint16(twoBytes[0]) << 8) | uint16(twoBytes[1])
   c8.incrementPC()
-  return utils.DecodeInstruction(codedInstruction)
+  return utils.InstructionFromBytecode(codedInstruction)
 }
 
 func (c8 *Chip8) executeInstruction(instruction *utils.Instruction) {

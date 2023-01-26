@@ -38,7 +38,7 @@ func (dis *disassembler) Disassemble() {
         // end of inputFile
         break
     }
-    inst := utils.DecodeInstruction((uint16(buf[0]) << 8) & uint16(buf[1]))
+    inst := utils.InstructionFromBytecode((uint16(buf[0]) << 8) & uint16(buf[1]))
     outputFile.WriteString(dis.instructionStrings[inst.A](&inst) + "\n")
   }
 }
