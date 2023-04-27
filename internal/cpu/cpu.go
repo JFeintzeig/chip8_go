@@ -27,6 +27,7 @@ const (
   RUNNING
 )
 
+// we need to track Pressed and JustReleased states for the sound timer
 type keypress struct {
   Pressed bool
   JustReleased bool
@@ -38,17 +39,24 @@ func NewKeypress() keypress {
 
 // TODO: i had to export Chip8 to use it in Display.go...another way?
 type Chip8 struct {
+  // program counter
   pc uint16
+  // index register
   i uint16
   delayTimer uint8
   soundTimer uint8
+  // just an array, but the UI framework will use this to draw real pixels.
   Display [32*64]uint8
   stack utils.Stack
   variableRegister [16]uint8
   memory [4096]byte
+  // maps the first nibble of an instruction to the actual execution logic
   instructionMap map[uint8]func(*utils.Instruction)
+  // just an array, but the UI framework will modify this
   Keyboard *[16]keypress
   clockSpeed uint16
+  // some instructions have slightly different implementations depending on version/spec
+  // this allows us to flip between them
   modern bool
   // TODO: refactor debugger into separate struct in same package
   // could maybe have a debugger struct w/methods that interfaces with Chip8...if part
@@ -108,6 +116,7 @@ func (c8 *Chip8) executeInstruction(instruction *utils.Instruction) {
   }
 }
 
+// WIP, only partly implemented
 func (c8 *Chip8) debugInstruction(instruction *utils.Instruction) {
   c8.executeInstruction(instruction)
   if c8.pc == c8.debugBreakpoint {
@@ -161,13 +170,11 @@ func (c8 *Chip8) prettyPrint() {
   fmt.Printf("%x\n", c8.variableRegister)
 }
 
+// TODO, part of debugger
 func (c8 *Chip8) safeValuePrint() {
 }
 
-// TODO: run some more test games, especially
-// newer stuff from https://johnearnest.github.io/chip8Archive/?sort=platform
-// see if i can find other bugs in my code
-// write unit tests
+// TODO: write unit tests
 func (c8 *Chip8) Execute() {
   loopCounter := 0
   for {
@@ -193,6 +200,7 @@ func (c8 *Chip8) Execute() {
   }
 }
 
+// copied from https://tobiasvl.github.io/blog/write-a-chip-8-emulator/
 var font = []uint8{
         0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
         0x20, 0x60, 0x20, 0x20, 0x70, // 1
